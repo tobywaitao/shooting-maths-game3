@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS 1.6: Math Identities Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Teko:wght@500;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+            background-color: #000;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        /* CS 1.6 HUD Style */
+        .cs-font {
+            font-family: 'Teko', sans-serif;
+            text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.9);
+        }
+
+        .cs-hud-green {
+            color: #55ff55;
+            text-shadow: 0 0 6px rgba(85, 255, 85, 0.6);
+        }
+
+        .cs-hud-yellow {
+            color: #ffcc00;
+            text-shadow: 0 0 6px rgba(255, 204, 0, 0.6);
+        }
+
+        .cs-hud-red {
+            color: #ff3333;
+            text-shadow: 0 0 6px rgba(255, 51, 51, 0.6);
+        }
+
+        .cs-panel {
+            background: rgba(18, 22, 16, 0.92);
+            border: 2px solid #3a4a35;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(85, 255, 85, 0.1);
+        }
+
+        /* Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .crosshair-line {
+            background-color: #00ff00;
+            position: absolute;
+            box-shadow: 0 0 2px #000;
+        }
+
+        /* Hitmarker */
+        #hitmarker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(45deg);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.1s ease-out;
+        }
+
+        .hit-line {
+            position: absolute;
+            background-color: #ff3333;
+        }
+
+        /* Damage Vignette */
+        #damage-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            box-shadow: inset 0 0 80px rgba(255, 0, 0, 0);
+            transition: box-shadow 0.1s ease-out;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.4);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a5d43;
+            border-radius: 3px;
+        }
+
+        /* Touch Control Overlay Styles */
+        .touch-btn {
+            background: rgba(0, 0, 0, 0.65);
+            border: 2px solid rgba(85, 255, 85, 0.6);
+            color: #55ff55;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            touch-action: manipulation;
+        }
+        .touch-btn:active {
+            background: rgba(85, 255, 85, 0.4);
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="select-none overflow-hidden">
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Touch Screen Control Overlay -->
+    <div id="touch-controls" class="absolute inset-0 pointer-events-none z-30 select-none">
+        <div id="joystick-zone" class="absolute bottom-8 left-8 w-36 h-36 rounded-full bg-black/40 border-2 border-green-500/40 pointer-events-auto flex items-center justify-center">
+            <div id="joystick-knob" class="w-14 h-14 rounded-full bg-green-500/60 border-2 border-white shadow-lg transform translate-x-0 translate-y-0 transition-transform duration-75"></div>
+        </div>
+
+        <div class="absolute bottom-32 right-36 text-white/40 text-xs text-right pointer-events-none hidden md:block">
+            <i class="fa-solid fa-hand-pointer mr-1"></i> 右側區域滑動控制鏡頭上下左右
+        </div>
+
+        <div class="absolute bottom-8 right-8 flex flex-col gap-3 pointer-events-auto items-end">
+            <div class="flex gap-3 items-center">
+                <button id="touch-btn-buy" class="touch-btn w-14 h-14 rounded-full flex flex-col items-center justify-center text-xs font-bold">
+                    <i class="fa-solid fa-cart-shopping text-base"></i>
+                    <span>商店</span>
+                </button>
+                <button id="touch-btn-reload" class="touch-btn w-14 h-14 rounded-full flex flex-col items-center justify-center text-xs font-bold">
+                    <i class="fa-solid fa-rotate-right text-base"></i>
+                    <span>換彈</span>
+                </button>
+                <button id="touch-btn-interact" class="touch-btn w-14 h-14 rounded-full border-yellow-500 text-yellow-400 flex flex-col items-center justify-center text-xs font-bold">
+                    <i class="fa-solid fa-hand text-base"></i>
+                    <span>互動</span>
+                </button>
+            </div>
+            
+            <button id="touch-btn-shoot" class="touch-btn w-20 h-20 rounded-full bg-red-900/60 border-2 border-red-500 text-red-400 flex flex-col items-center justify-center font-bold text-sm shadow-[0_0_15px_rgba(239,68,68,0.5)] active:bg-red-600 active:text-white">
+                <i class="fa-solid fa-crosshairs text-2xl mb-1"></i>
+                <span>射擊</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Damage Red Flash Overlay -->
+    <div id="damage-overlay"></div>
+
+    <!-- FPS Crosshair -->
+    <div id="crosshair" class="w-8 h-8">
+        <div class="crosshair-line w-2 h-0.5 top-3.5 left-0"></div>
+        <div class="crosshair-line w-2 h-0.5 top-3.5 right-0"></div>
+        <div class="crosshair-line w-0.5 h-2 top-0 left-3.5"></div>
+        <div class="crosshair-line w-0.5 h-2 bottom-0 left-3.5"></div>
+        <div class="w-1 h-1 bg-green-400 rounded-full absolute top-3.5 left-3.5 transform -translate-x-0.5 -translate-y-0.5"></div>
+    </div>
+
+    <!-- Hitmarker Overlay -->
+    <div id="hitmarker">
+        <div class="hit-line w-full h-0.5 top-2.5 left-0"></div>
+        <div class="hit-line h-full w-0.5 left-2.5 top-0"></div>
+    </div>
+
+    <!-- Interactive Prompt -->
+    <div id="interaction-prompt" class="absolute top-2/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 hidden text-center z-20">
+        <div class="bg-black/80 border-2 border-yellow-500 text-yellow-400 px-6 py-3 rounded-md shadow-lg text-lg animate-pulse flex items-center gap-3">
+            <span class="bg-yellow-500 text-black font-bold px-2 py-1 rounded">E</span>
+            <span id="prompt-text">拆除 C4 炸彈 (解開恆等式數學題)</span>
+        </div>
+    </div>
+
+    <!-- Top Center Round Info & Timer -->
+    <div class="absolute top-4 left-1/2 transform -translate-x-1/2 flex items-center gap-6 z-10 cs-font text-3xl">
+        <div class="flex items-center gap-2 bg-black/60 px-4 py-1 rounded border border-blue-600/50">
+            <span class="text-blue-400 font-bold">CT</span>
+            <span id="ct-score" class="text-white text-4xl">0</span>
+        </div>
+        
+        <div class="bg-black/80 border-2 border-yellow-600/80 px-6 py-1 rounded-md text-center min-w-[120px]">
+            <div id="round-timer" class="cs-hud-yellow text-4xl tracking-wider font-bold">02:00</div>
+            <div id="round-status" class="text-xs text-gray-300 font-sans tracking-normal uppercase">第 1 回合 - 進行中</div>
+        </div>
+
+        <div class="flex items-center gap-2 bg-black/60 px-4 py-1 rounded border border-red-600/50">
+            <span id="t-score" class="text-white text-4xl">0</span>
+            <span class="text-red-500 font-bold">T</span>
+        </div>
+    </div>
+
+    <!-- Top Left Minimap Radar -->
+    <div class="absolute top-4 left-4 z-10 bg-black/80 border-2 border-green-800 rounded-full w-36 h-36 overflow-hidden relative shadow-lg">
+        <div class="absolute inset-0 rounded-full border border-green-500/30"></div>
+        <div class="absolute top-1/2 left-0 right-0 h-0.5 bg-green-500/20"></div>
+        <div class="absolute top-0 bottom-0 left-1/2 w-0.5 bg-green-500/20"></div>
+        <div id="radar-player" class="absolute top-1/2 left-1/2 w-2.5 h-2.5 bg-green-400 rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-[0_0_8px_#00ff00]"></div>
+        <div id="radar-dots-container" class="absolute inset-0"></div>
+        <div class="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-[10px] text-green-500/70 uppercase">DE_DUST2_MATH</div>
+    </div>
+
+    <!-- Top Right Kill Feed -->
+    <div id="kill-feed" class="absolute top-4 right-4 z-10 flex flex-col gap-1 text-sm font-bold text-right max-w-xs"></div>
+
+    <!-- Bottom CS 1.6 Classic HUD -->
+    <div class="absolute bottom-4 left-6 right-6 z-10 flex justify-between items-end pointer-events-none cs-font">
+        <!-- Left: Health & Armor -->
+        <div class="flex items-center gap-8 bg-black/60 px-6 py-2 rounded-lg border border-green-900/60">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-heart text-2xl cs-hud-green"></i>
+                <span id="hud-health" class="text-5xl cs-hud-green font-bold">100</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-shield-halved text-2xl cs-hud-yellow"></i>
+                <span id="hud-armor" class="text-5xl cs-hud-yellow font-bold">100</span>
+            </div>
+        </div>
+
+        <!-- Center: Bomb Warning -->
+        <div id="bomb-warning" class="hidden flex items-center gap-3 bg-red-900/80 border-2 border-red-500 text-white px-6 py-2 rounded-lg text-2xl animate-bounce">
+            <i class="fa-solid fa-bomb text-yellow-400 text-3xl"></i>
+            <span>炸彈已被放置於 A 區！請速去拆除！</span>
+        </div>
+
+        <!-- Right: Money & Weapon Ammo -->
+        <div class="flex items-center gap-8 bg-black/60 px-6 py-2 rounded-lg border border-green-900/60">
+            <div class="flex items-center gap-2">
+                <span class="text-3xl cs-hud-yellow">$</span>
+                <span id="hud-money" class="text-5xl cs-hud-yellow font-bold">1600</span>
+            </div>
+            <div class="flex items-center gap-4 border-l border-gray-700 pl-6">
+                <div class="text-right">
+                    <div id="hud-weapon-name" class="text-lg text-gray-400 font-sans tracking-wide">AK-47 步槍</div>
+                    <div class="flex items-baseline gap-1">
+                        <span id="hud-ammo-clip" class="text-5xl cs-hud-green font-bold">30</span>
+                        <span class="text-2xl text-gray-500">/</span>
+                        <span id="hud-ammo-reserve" class="text-3xl text-gray-400">90</span>
+                    </div>
+                </div>
+                <i id="hud-weapon-icon" class="fa-solid fa-gun text-3xl cs-hud-green"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buy Menu Modal (B Key) -->
+    <div id="buy-menu" class="absolute inset-0 bg-black/85 z-40 hidden flex items-center justify-center p-6">
+        <div class="cs-panel max-w-3xl w-full p-6 rounded-lg text-white">
+            <div class="flex justify-between items-center border-b border-green-800/80 pb-4 mb-4">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-cart-shopping text-2xl text-yellow-400"></i>
+                    <h2 class="text-2xl font-bold text-yellow-400 tracking-wider">軍火商店 (BUY MENU)</h2>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-xl cs-font cs-hud-yellow">金錢: $<span id="shop-money">1600</span></div>
+                    <button onclick="toggleBuyMenu()" class="bg-red-800 hover:bg-red-700 text-white font-bold px-3 py-1 rounded text-sm transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span>關閉 (B / ESC)</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-3">
+                    <h3 class="text-green-400 text-sm font-bold uppercase tracking-wider mb-2 border-b border-gray-800 pb-1">Primary Weapons</h3>
+                    
+                    <button onclick="buyWeapon('ak47')" class="w-full flex justify-between items-center bg-gray-900/80 hover:bg-green-950 border border-gray-700 hover:border-green-500 p-3 rounded transition text-left group">
+                        <div>
+                            <div class="font-bold text-white group-hover:text-green-400">1. AK-47 突擊步槍</div>
+                            <div class="text-xs text-gray-400">高傷害、強後座力 (30/90彈藥)</div>
+                        </div>
+                        <span class="text-yellow-400 font-bold">$2700</span>
+                    </button>
+
+                    <button onclick="buyWeapon('m4a1')" class="w-full flex justify-between items-center bg-gray-900/80 hover:bg-green-950 border border-gray-700 hover:border-green-500 p-3 rounded transition text-left group">
+                        <div>
+                            <div class="font-bold text-white group-hover:text-green-400">2. M4A1 卡賓槍</div>
+                            <div class="text-xs text-gray-400">高精準度、穩定射速 (30/90彈藥)</div>
+                        </div>
+                        <span class="text-yellow-400 font-bold">$3100</span>
+                    </button>
+
+                    <button onclick="buyWeapon('awp')" class="w-full flex justify-between items-center bg-gray-900/80 hover:bg-green-950 border border-gray-700 hover:border-green-500 p-3 rounded transition text-left group">
+                        <div>
+                            <div class="font-bold text-white group-hover:text-green-400">3. AWP 重型狙擊槍</div>
+                            <div class="text-xs text-gray-400">一槍致命 (10/30彈藥)</div>
+                        </div>
+                        <span class="text-yellow-400 font-bold">$4750</span>
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    <h3 class="text-green-400 text-sm font-bold uppercase tracking-wider mb-2 border-b border-gray-800 pb-1">Equipment & Math Gear</h3>
+                    
+                    <button onclick="buyWeapon('deagle')" class="w-full flex justify-between items-center bg-gray-900/80 hover:bg-green-950 border border-gray-700 hover:border-green-500 p-3 rounded transition text-left group">
+                        <div>
+                            <div class="font-bold text-white group-hover:text-green-400">4. Desert Eagle 沙漠之鷹</div>
+                            <div class="text-xs text-gray-400">副武器手槍 (7/35彈藥)</div>
+                        </div>
+                        <span class="text-yellow-400 font-bold">$650</span>
+                    </button>
+
+                    <button onclick="buyItem('armor')" class="w-full flex justify-between items-center bg-gray-900/80 hover:bg-green-950 border border-gray-700 hover:border-green-500 p-3 rounded transition text-left group">
+                        <div>
+                            <div class="font-bold text-white group-hover:text-green-400">5. 凱夫拉防彈衣 + 頭盔</div>
+                            <div class="text-xs text-gray-400">護甲值提升至 100</div>
+                        </div>
+                        <span class="text-yellow-400 font-bold">$1000</span>
+                    </button>
+
+                    <button onclick="buyItem('math_hint')" class="w-full flex justify-between items-center bg-gray-900/80 hover:bg-yellow-950 border border-yellow-700 hover:border-yellow-400 p-3 rounded transition text-left group">
+                        <div>
+                            <div class="font-bold text-yellow-300 group-hover:text-yellow-200"><i class="fa-solid fa-lightbulb mr-1"></i> 6. 恆等式拆彈公式提示券</div>
+                            <div class="text-xs text-yellow-500/80">拆彈與解題時顯示關鍵提示</div>
+                        </div>
+                        <span class="text-yellow-400 font-bold">$500</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-col md:flex-row justify-between items-center gap-3 border-t border-gray-800 pt-3">
+                <div class="text-xs text-gray-500">
+                    提示: 在地圖中擊殺敵方 Bot 可獲得 $300-$500，解開地圖上的「恆等式補給箱」或「擊中數學靶標」可獲得額外高額獎勵！
+                </div>
+                <button onclick="toggleBuyMenu()" class="w-full md:w-auto px-6 py-2 bg-green-700 hover:bg-green-600 text-white font-bold rounded-lg text-sm transition shadow-lg cursor-pointer flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-check"></i>
+                    <span>完成購物 / 返回戰場</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Math Identity Challenge / Bomb Defusal Modal -->
+    <div id="math-modal" class="absolute inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-6">
+        <div class="cs-panel max-w-2xl w-full p-6 rounded-lg text-white border-2 border-yellow-500/80 shadow-[0_0_30px_rgba(234,179,8,0.2)]">
+            <div class="flex justify-between items-center border-b border-yellow-600/50 pb-3 mb-4">
+                <div class="flex items-center gap-3">
+                    <i id="math-modal-icon" class="fa-solid fa-bomb text-3xl text-red-500 animate-pulse"></i>
+                    <div>
+                        <h2 id="math-modal-title" class="text-2xl font-bold text-yellow-400 tracking-wider">C4 炸彈拆除安全鎖 - 恆等式驗證</h2>
+                        <div id="math-modal-subtitle" class="text-xs text-gray-400">中二數學 Chapter 2: Identities & Factorization</div>
+                    </div>
+                </div>
+                <div id="math-timer-box" class="bg-red-950/80 border border-red-600 px-3 py-1 rounded text-right">
+                    <div class="text-[10px] text-red-400 uppercase">倒數計時</div>
+                    <div id="math-timer" class="text-2xl cs-font text-red-400 font-bold">25.0s</div>
+                </div>
+            </div>
+
+            <div class="bg-gray-950 p-5 rounded-lg border border-gray-800 mb-5 relative">
+                <div class="text-xs text-green-400 uppercase font-bold mb-1 tracking-wider flex justify-between">
+                    <span><i class="fa-solid fa-book-open mr-1"></i> 課本練習題型</span>
+                    <span id="math-topic-tag" class="text-yellow-400">2.2 Algebraic Identities</span>
+                </div>
+                <div id="math-question-text" class="text-xl md:text-2xl font-bold text-white my-3 leading-relaxed">
+                    展開 (Expand): (3x + 4)(3x - 4)
+                </div>
+                <div id="math-hint-box" class="hidden mt-2 p-2 bg-yellow-950/60 border border-yellow-700/60 rounded text-xs text-yellow-300">
+                    <i class="fa-solid fa-circle-info mr-1"></i> 公式提示: 平方差恆等式 (a+b)(a-b) = a² - b²
+                </div>
+            </div>
+
+            <div id="math-options-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <!-- Options populated dynamically -->
+            </div>
+
+            <div class="flex justify-between items-center text-xs text-gray-400 border-t border-gray-800 pt-3">
+                <span id="math-status-msg" class="text-yellow-400 font-bold">請選擇正確的答案...</span>
+                <button onclick="closeMathModal(false)" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded font-bold transition">放棄拆除 (ESC)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scoreboard Overlay (Hold TAB) -->
+    <div id="scoreboard" class="absolute inset-0 bg-black/85 z-40 hidden flex items-center justify-center p-8">
+        <div class="cs-panel max-w-3xl w-full p-6 rounded-lg text-white">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
+                <h2 class="text-2xl font-bold cs-hud-yellow tracking-wider">戰局統計 (DE_DUST2_MATH)</h2>
+                <div class="text-sm text-gray-400">反恐精英 (CT) vs 恐怖分子 (T)</div>
+            </div>
+
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="text-xs text-gray-400 border-b border-gray-800 uppercase">
+                        <th class="p-2">玩家名稱</th>
+                        <th class="p-2 text-center">陣營</th>
+                        <th class="p-2 text-center">擊殺 (K)</th>
+                        <th class="p-2 text-center">陣亡 (D)</th>
+                        <th class="p-2 text-center">解題次數</th>
+                        <th class="p-2 text-right">得分</th>
+                    </tr>
+                </thead>
+                <tbody id="scoreboard-body" class="divide-y divide-gray-800/50 text-sm">
+                    <!-- Populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Start / Game Over Screen Overlay -->
+    <div id="start-screen" class="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-6">
+        <div class="cs-panel max-w-xl w-full p-8 rounded-xl text-center text-white border-2 border-green-600/60 shadow-[0_0_50px_rgba(34,197,94,0.15)]">
+            <div class="mb-4 inline-block bg-green-950 border border-green-500/50 px-4 py-1 rounded-full text-green-400 text-xs font-bold tracking-widest uppercase">
+                Hong Kong Junior Sec Math 2A Integration
+            </div>
+            
+            <h1 class="text-4xl md:text-5xl font-black text-yellow-400 tracking-wider cs-font mb-2">CS 1.6: 恆等式戰場</h1>
+            <p class="text-gray-300 text-sm mb-6 leading-relaxed">
+                結合經典 CS 1.6 第一人稱射擊與香港中二數學<br>
+                <span class="text-green-400 font-bold"> Chapter 2: Identities & Factorization </span><br>
+                <span class="text-yellow-300 font-bold">🎯 所有射擊目標皆為【數學題標靶】！擊中即解題！</span>
+            </p>
+
+            <div class="bg-gray-950 p-4 rounded-lg text-left text-xs space-y-2 text-gray-300 border border-gray-800 mb-6">
+                <div class="font-bold text-yellow-400 border-b border-gray-800 pb-1 mb-2">🎮 操作說明 (Controls):</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><span class="bg-gray-800 px-1.5 py-0.5 rounded text-green-400">W A S D / 搖桿</span> 移動 (Move)</div>
+                    <div><span class="bg-gray-800 px-1.5 py-0.5 rounded text-green-400">滑鼠 / 右螢幕</span> 射擊數學標靶</div>
+                    <div><span class="bg-gray-800 px-1.5 py-0.5 rounded text-green-400">R / 換彈鈕</span> 補滿彈藥 (Reload)</div>
+                    <div><span class="bg-gray-800 px-1.5 py-0.5 rounded text-green-400">E / 互動鈕</span> 拆除 C4 / 破解補給箱</div>
+                    <div><span class="bg-gray-800 px-1.5 py-0.5 rounded text-green-400">B / 商店鈕</span> 打開軍火商店 (Buy Menu)</div>
+                    <div><span class="bg-gray-800 px-1.5 py-0.5 rounded text-green-400">TAB</span> 查看比分板 (Scoreboard)</div>
+                </div>
+            </div>
+
+            <button id="start-btn" class="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white font-bold text-xl rounded-lg shadow-lg hover:shadow-green-500/30 transition transform hover:-translate-y-0.5">
+                <i class="fa-solid fa-crosshairs mr-2"></i> 開始戰鬥 (CLICK TO START)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================================
+           1. AUDIO SYNTHESIZER (Web Audio API - No External Assets Needed)
+           ========================================================================= */
+        class CSAudioEngine {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playGunshot(type = 'ak47') {
+                if (!this.ctx) return;
+                const ctx = this.ctx;
+                const now = ctx.currentTime;
+
+                const bufferSize = ctx.sampleRate * 0.2;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+
+                const gain = ctx.createGain();
+
+                if (type === 'awp') {
+                    filter.frequency.setValueAtTime(1200, now);
+                    filter.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+                    gain.gain.setValueAtTime(1.0, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                } else if (type === 'deagle') {
+                    filter.frequency.setValueAtTime(2000, now);
+                    filter.frequency.exponentialRampToValueAtTime(150, now + 0.2);
+                    gain.gain.setValueAtTime(0.8, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+                } else {
+                    filter.frequency.setValueAtTime(3000, now);
+                    filter.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+                    gain.gain.setValueAtTime(0.6, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+                }
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+
+                noise.start(now);
+            }
+
+            playHeadshotSound() {
+                if (!this.ctx) return;
+                const ctx = this.ctx;
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200, now);
+                osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            playReloadSound() {
+                if (!this.ctx) return;
+                const ctx = this.ctx;
+                const now = ctx.currentTime;
+                
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.setValueAtTime(900, now + 0.1);
+
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playBombTick() {
+                if (!this.ctx) return;
+                const ctx = this.ctx;
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1000, now);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            }
+
+            playDefuseSuccess() {
+                if (!this.ctx) return;
+                const ctx = this.ctx;
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(554, now + 0.1);
+                osc.frequency.setValueAtTime(659, now + 0.2);
+
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+        }
+
+        const soundFX = new CSAudioEngine();
+
+        /* =========================================================================
+           2. DIVERSE MATH QUESTION DATABASE (HK Junior Sec Math 2A Chapter 2)
+           ========================================================================= */
+        const MATH_QUESTIONS_DB = [
+            // 2.1 Meaning of Identities
+            {
+                topic: "2.1 Meaning of Identities",
+                question: "下列何者為恆等式 (Identity)？",
+                options: ["2(x + 3) = 2x + 6", "2x + 3 = 7", "x² = 9", "3x - 1 = x + 5"],
+                correct: 0,
+                hint: "恆等式對於未知數的所有值都成立（左式 L.H.S. ≡ 右式 R.H.S.）。"
+            },
+            // 2.1 Finding Unknown Constants
+            {
+                topic: "2.1 Finding Unknown Constants",
+                question: "若 4(2x - 3) ≡ A + Bx，求常數 A 與 B 的值：",
+                options: ["A = -12, B = 8", "A = 8, B = -12", "A = -3, B = 2", "A = 12, B = 8"],
+                correct: 0,
+                hint: "展開左式 L.H.S.: 8x - 12 = -12 + 8x。比較同類項得 A = -12, B = 8。"
+            },
+            {
+                topic: "2.1 Finding Unknown Constants",
+                question: "若 (x - 2)(x + 3) ≡ Ax² + x + B，求常數 A 與 B 的值：",
+                options: ["A = 1, B = -6", "A = 1, B = 6", "A = 2, B = -6", "A = -1, B = -6"],
+                correct: 0,
+                hint: "展開左式：x² + 3x - 2x - 6 = x² + x - 6。故 A = 1, B = -6。"
+            },
+            {
+                topic: "2.1 Finding Unknown Constants",
+                question: "若 (x + a)² ≡ x² + 10x + b，求常數 a 與 b 的值：",
+                options: ["a = 5, b = 25", "a = 10, b = 100", "a = 5, b = 10", "a = 25, b = 5"],
+                correct: 0,
+                hint: "(x+a)² = x² + 2ax + a²。比較 x 的係數得 2a = 10，故 a = 5，b = 5² = 25。"
+            },
+            {
+                topic: "2.1 Finding Unknown Constants",
+                question: "若 (2x - 1)(x + k) ≡ 2x² + 5x - 3，求常數 k 的值：",
+                options: ["k = 3", "k = -3", "k = 5", "k = 2"],
+                correct: 0,
+                hint: "比較常數項：(-1) × k = -3，因此 k = 3。"
+            },
+            // 2.2 Difference of Two Squares
+            {
+                topic: "2.2 Difference of Two Squares",
+                question: "展開 (Expand) 表示式：(x + 4)(x - 4)",
+                options: ["x² - 16", "x² - 8", "x² + 16", "x² - 4x - 16"],
+                correct: 0,
+                hint: "公式：(a+b)(a-b) = a² - b²。在此題中 a=x, b=4。"
+            },
+            {
+                topic: "2.2 Difference of Two Squares",
+                question: "展開 (Expand) 表示式：(4x - 2y)(4x + 2y)",
+                options: ["16x² - 4y²", "4x² - 2y²", "16x² - 2y²", "8x² - 4y²"],
+                correct: 0,
+                hint: "(4x)² - (2y)² = 16x² - 4y²。"
+            },
+            {
+                topic: "2.2 Difference of Two Squares",
+                question: "展開 (Expand) 表示式：(1 - 5x)(1 + 5x)",
+                options: ["1 - 25x²", "1 - 10x²", "1 - 5x²", "25x² - 1"],
+                correct: 0,
+                hint: "1² - (5x)² = 1 - 25x²。"
+            },
+            {
+                topic: "2.2 Mental Calculation",
+                question: "不使用計算機，利用恆等式求 103 × 97 的值：",
+                options: ["9991", "9901", "10009", "9981"],
+                correct: 0,
+                hint: "103 × 97 = (100 + 3)(100 - 3) = 100² - 3² = 10000 - 9。"
+            },
+            {
+                topic: "2.2 Mental Calculation",
+                question: "不使用計算機，利用平方差恆等式求 52² - 48² 的值：",
+                options: ["400", "200", "800", "1000"],
+                correct: 0,
+                hint: "a² - b² = (a+b)(a-b) = (52+48)(52-48) = 100 × 4 = 400。"
+            },
+            // 2.2 Perfect Square Identities
+            {
+                topic: "2.2 Perfect Square Identities",
+                question: "展開 (Expand) 表示式：(x + 5)²",
+                options: ["x² + 10x + 25", "x² + 25", "x² + 5x + 25", "x² + 10x + 10"],
+                correct: 0,
+                hint: "公式：(a+b)² = a² + 2ab + b²。此處 a=x, b=5。"
+            },
+            {
+                topic: "2.2 Perfect Square Identities",
+                question: "展開 (Expand) 表示式：(2x - 3y)²",
+                options: ["4x² - 12xy + 9y²", "4x² - 9y²", "4x² - 6xy + 9y²", "2x² - 12xy + 3y²"],
+                correct: 0,
+                hint: "公式：(a-b)² = a² - 2ab + b²。(2x)² - 2(2x)(3y) + (3y)²。"
+            },
+            {
+                topic: "2.2 Perfect Square Identities",
+                question: "不使用計算機，利用恆等式求 99² 的值：",
+                options: ["9801", "9810", "9901", "9601"],
+                correct: 0,
+                hint: "99² = (100 - 1)² = 100² - 2(100)(1) + 1² = 10000 - 200 + 1 = 9801。"
+            },
+            // 2.3 Factorization by Using Identities
+            {
+                topic: "2.3 Factorization by Identities",
+                question: "因式分解 (Factorize)：x² - 81",
+                options: ["(x - 9)(x + 9)", "(x - 9)²", "(x + 9)²", "(x - 81)(x + 1)"],
+                correct: 0,
+                hint: "利用平方差公式 a² - b² = (a - b)(a + b)。這裏 a = x, b = 9。"
+            },
+            {
+                topic: "2.3 Factorization by Identities",
+                question: "因式分解 (Factorize)：4x² - 25y²",
+                options: ["(2x - 5y)(2x + 5y)", "(4x - 5y)(4x + 5y)", "(2x - 5y)²", "(2x + 5y)²"],
+                correct: 0,
+                hint: "4x² - 25y² = (2x)² - (5y)² = (2x - 5y)(2x + 5y)。"
+            },
+            {
+                topic: "2.3 Factorization by Identities",
+                question: "因式分解 (Factorize)：x² + 12x + 36",
+                options: ["(x + 6)²", "(x - 6)²", "(x + 12)(x + 3)", "(x + 4)(x + 9)"],
+                correct: 0,
+                hint: "檢查是否為完全平方式：x² + 2(6)(x) + 6² = (x + 6)²。"
+            },
+            {
+                topic: "2.3 Factorization by Identities",
+                question: "因式分解 (Factorize)：9x² - 24x + 16",
+                options: ["(3x - 4)²", "(3x + 4)²", "(9x - 4)(x - 4)", "(3x - 16)(3x + 1)"],
+                correct: 0,
+                hint: "9x² - 24x + 16 = (3x)² - 2(3x)(4) + 4² = (3x - 4)²。"
+            },
+            // 2.3 Taking out Common Factors & Grouping
+            {
+                topic: "2.3 Taking out Common Factors",
+                question: "因式分解 (Factorize)：6x³y - 9x²y²",
+                options: ["3x²y(2x - 3y)", "3xy(2x² - 3xy)", "6x²y(x - 3y)", "3x²(2xy - 3y²)"],
+                correct: 0,
+                hint: "提取最大公因式 3x²y，括號內剩餘 (2x - 3y)。"
+            },
+            {
+                topic: "2.3 Factorization by Grouping",
+                question: "因式分解 (Factorize)：ax + ay + bx + by",
+                options: ["(a + b)(x + y)", "(a - b)(x + y)", "(a + x)(b + y)", "(a + y)(b + x)"],
+                correct: 0,
+                hint: "分組提取公因式：a(x + y) + b(x + y) = (a + b)(x + y)。"
+            }
+        ];
+
+        /* =========================================================================
+           3. THREE.JS 3D SCENE & MAP GENERATION
+           ========================================================================= */
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xd2b48c);
+        scene.fog = new THREE.FogExp2(0xd2b48c, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xfff5ea, 0.7);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 0.9);
+        sunLight.position.set(40, 60, 20);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 150;
+        const d = 50;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        scene.add(sunLight);
+
+        const mapColliders = [];
+        const interactiveCrates = [];
+        const mathTargets = [];
+        let c4BombEntity = null;
+
+        function createMathTargetTexture(textLabel = "🎯 MATH") {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, 256, 256);
+            
+            const center = 128;
+            const radii = [120, 90, 60, 30];
+            const colors = ['#ef4444', '#ffffff', '#ef4444', '#10b981'];
+
+            radii.forEach((r, i) => {
+                ctx.beginPath();
+                ctx.arc(center, center, r, 0, Math.PI * 2);
+                ctx.fillStyle = colors[i];
+                ctx.fill();
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#000000';
+                ctx.stroke();
+            });
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 24px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.strokeText(textLabel, center, center);
+            ctx.fillText(textLabel, center, center);
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createMathTarget(x, z, ry = 0, label = "a²-b²") {
+            const targetGroup = new THREE.Group();
+            targetGroup.position.set(x, 0, z);
+            targetGroup.rotation.y = ry;
+
+            const postGeo = new THREE.CylinderGeometry(0.1, 0.1, 2.2);
+            const postMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.5 });
+            const post = new THREE.Mesh(postGeo, postMat);
+            post.position.y = 1.1;
+            post.castShadow = true;
+            targetGroup.add(post);
+
+            const boardGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.1, 32);
+            const targetTex = createMathTargetTexture(label);
+            const boardMat = [
+                new THREE.MeshStandardMaterial({ color: 0x222222 }),
+                new THREE.MeshStandardMaterial({ map: targetTex, roughness: 0.4 }),
+                new THREE.MeshStandardMaterial({ color: 0x222222 })
+            ];
+            const board = new THREE.Mesh(boardGeo, boardMat);
+            board.rotation.x = Math.PI / 2;
+            board.position.y = 2.2;
+            board.castShadow = true;
+            board.userData = { isTargetBoard: true, label: label };
+            targetGroup.add(board);
+
+            scene.add(targetGroup);
+
+            const targetObj = {
+                group: targetGroup,
+                board: board,
+                initialRotationX: board.rotation.x,
+                hit: false,
+                resetTimer: null
+            };
+
+            mathTargets.push(targetObj);
+            mapColliders.push(new THREE.Box3().setFromObject(post));
+            return targetObj;
+        }
+
+        function createSandstoneTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#c2a679';
+            ctx.fillRect(0, 0, 256, 256);
+            for (let i = 0; i < 4000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)';
+                ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+            }
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createCrateTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#8b5a2b';
+            ctx.fillRect(0, 0, 256, 256);
+            ctx.strokeStyle = '#4a2e11';
+            ctx.lineWidth = 12;
+            ctx.strokeRect(6, 6, 244, 244);
+            ctx.beginPath();
+            ctx.moveTo(10, 10); ctx.lineTo(246, 246);
+            ctx.moveTo(246, 10); ctx.lineTo(10, 246);
+            ctx.stroke();
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        const sandstoneTex = createSandstoneTexture();
+        sandstoneTex.wrapS = THREE.RepeatWrapping;
+        sandstoneTex.wrapT = THREE.RepeatWrapping;
+
+        const crateTex = createCrateTexture();
+        const sandstoneMat = new THREE.MeshStandardMaterial({ map: sandstoneTex, roughness: 0.9 });
+        const crateMat = new THREE.MeshStandardMaterial({ map: crateTex, roughness: 0.7 });
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0xb5996b, roughness: 0.95 });
+
+        const floorGeo = new THREE.PlaneGeometry(80, 80);
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        function createWall(x, z, w, h, d, ry = 0) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const wall = new THREE.Mesh(geo, sandstoneMat);
+            wall.position.set(x, h / 2, z);
+            wall.rotation.y = ry;
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            scene.add(wall);
+            mapColliders.push(new THREE.Box3().setFromObject(wall));
+            return wall;
+        }
+
+        function createCrate(x, z, size = 2, isSupply = false) {
+            const geo = new THREE.BoxGeometry(size, size, size);
+            const mat = isSupply ? new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.5 }) : crateMat;
+            const crate = new THREE.Mesh(geo, mat);
+            crate.position.set(x, size / 2, z);
+            crate.castShadow = true;
+            crate.receiveShadow = true;
+            scene.add(crate);
+            mapColliders.push(new THREE.Box3().setFromObject(crate));
+
+            if (isSupply) {
+                const light = new THREE.PointLight(0x3b82f6, 1, 4);
+                light.position.set(x, size + 0.5, z);
+                scene.add(light);
+                crate.userData = { type: 'supply_crate', solved: false };
+                interactiveCrates.push(crate);
+            }
+            return crate;
+        }
+
+        function buildMap() {
+            createWall(0, -40, 80, 8, 2);
+            createWall(0, 40, 80, 8, 2);
+            createWall(-40, 0, 2, 8, 80);
+            createWall(40, 0, 2, 8, 80);
+
+            createWall(-15, -10, 2, 8, 30);
+            createWall(-15, 15, 2, 8, 20);
+
+            createWall(15, -15, 2, 8, 30);
+            createWall(25, 10, 20, 8, 2);
+
+            createWall(0, 5, 16, 8, 2);
+            createWall(0, -20, 16, 8, 2);
+
+            createCrate(-25, -25, 2.5);
+            createCrate(-23, -25, 2.5);
+            createCrate(-25, -22.5, 2.5);
+
+            createCrate(28, 25, 3);
+            createCrate(25, 28, 2.5);
+
+            createCrate(-5, -5, 2, true);
+            createCrate(10, 20, 2, true);
+
+            // 3D Math Targets around the battlefield
+            createMathTarget(-12, -22, Math.PI / 2, "(a+b)(a-b)");
+            createMathTarget(18, 12, -Math.PI / 2, "(a+b)²");
+            createMathTarget(5, -30, 0, "A+Bx");
+            createMathTarget(-30, 15, Math.PI / 4, "103×97");
+            createMathTarget(28, -25, -Math.PI / 3, "x²-81");
+            createMathTarget(-18, 28, Math.PI / 2, "(2x-3y)²");
+
+            // C4 Bomb
+            const c4Geo = new THREE.BoxGeometry(1.2, 0.6, 0.8);
+            const c4Mat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3 });
+            c4BombEntity = new THREE.Mesh(c4Geo, c4Mat);
+            c4BombEntity.position.set(-28, 0.3, -28);
+            scene.add(c4BombEntity);
+
+            const c4Light = new THREE.PointLight(0xff0000, 2, 3);
+            c4Light.position.set(-28, 0.8, -28);
+            scene.add(c4Light);
+            c4BombEntity.userData = { light: c4Light, type: 'c4_bomb' };
+        }
+
+        buildMap();
+
+        /* =========================================================================
+           4. PLAYER STATE & CAMERA / WEAPON SETUP
+           ========================================================================= */
+        const player = {
+            position: new THREE.Vector3(0, 1.6, 25),
+            health: 100,
+            armor: 100,
+            money: 1600,
+            kills: 0,
+            deaths: 0,
+            mathSolvedCount: 0,
+            hasMathHint: false,
+            currentWeapon: 'ak47',
+            weapons: {
+                ak47: { name: 'AK-47 步槍', damage: 35, clip: 30, maxClip: 30, reserve: 90 },
+                m4a1: { name: 'M4A1 卡賓槍', damage: 32, clip: 30, maxClip: 30, reserve: 90 },
+                awp: { name: 'AWP 重型狙擊槍', damage: 110, clip: 10, maxClip: 10, reserve: 30 },
+                deagle: { name: 'Desert Eagle', damage: 50, clip: 7, maxClip: 7, reserve: 35 }
+            }
+        };
+
+        const gunGroup = new THREE.Group();
+        camera.add(gunGroup);
+        scene.add(camera);
+
+        function buildGunMesh() {
+            while (gunGroup.children.length > 0) gunGroup.remove(gunGroup.children[0]);
+
+            const isAWP = player.currentWeapon === 'awp';
+            const isPistol = player.currentWeapon === 'deagle';
+
+            const bodyGeo = isPistol ? new THREE.BoxGeometry(0.1, 0.18, 0.4) : new THREE.BoxGeometry(0.12, 0.2, 0.9);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: isAWP ? 0x4b5320 : 0x222222, metalness: 0.8, roughness: 0.3 });
+            const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+            bodyMesh.position.set(0.2, -0.22, -0.45);
+            gunGroup.add(bodyMesh);
+
+            const barrelGeo = new THREE.CylinderGeometry(0.02, 0.02, isPistol ? 0.3 : 0.6);
+            const barrelMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 });
+            const barrelMesh = new THREE.Mesh(barrelGeo, barrelMat);
+            barrelMesh.rotation.x = Math.PI / 2;
+            barrelMesh.position.set(0.2, -0.18, isPistol ? -0.6 : -0.9);
+            gunGroup.add(barrelMesh);
+
+            const muzzleLight = new THREE.PointLight(0xffaa00, 0, 3);
+            muzzleLight.position.set(0.2, -0.18, isPistol ? -0.75 : -1.2);
+            gunGroup.add(muzzleLight);
+            gunGroup.userData.muzzleLight = muzzleLight;
+        }
+
+        buildGunMesh();
+
+        /* =========================================================================
+           5. ENEMY BOT AI (MOVING MATH TARGET DUMMIES)
+           ========================================================================= */
+        const bots = [];
+        const botFormulas = ["x²-y²", "(a+b)²", "99²", "4x²-25", "A+Bx", "(x+6)²"];
+
+        class EnemyBot {
+            constructor(x, z, id) {
+                this.id = id;
+                this.health = 100;
+                this.alive = true;
+                this.speed = 3.2;
+                this.lastShotTime = 0;
+
+                this.mesh = new THREE.Group();
+                this.mesh.position.set(x, 0, z);
+
+                // Bot Body Frame
+                const bodyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.4);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.6 });
+                const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+                bodyMesh.position.y = 0.7;
+                bodyMesh.castShadow = true;
+                this.mesh.add(bodyMesh);
+
+                // Math Target Mounted on Chest
+                const formulaLabel = botFormulas[(id - 1) % botFormulas.length];
+                const targetTex = createMathTargetTexture(`🎯 ${formulaLabel}`);
+                const boardGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.08, 32);
+                const boardMat = [
+                    new THREE.MeshStandardMaterial({ color: 0x111111 }),
+                    new THREE.MeshStandardMaterial({ map: targetTex, roughness: 0.3 }),
+                    new THREE.MeshStandardMaterial({ color: 0x111111 })
+                ];
+                this.targetBoard = new THREE.Mesh(boardGeo, boardMat);
+                this.targetBoard.rotation.x = Math.PI / 2;
+                this.targetBoard.position.set(0, 0.9, 0.22);
+                this.targetBoard.userData = { isBotTarget: true, parentBot: this, label: formulaLabel };
+                this.mesh.add(this.targetBoard);
+
+                // Head Target
+                const headGeo = new THREE.SphereGeometry(0.28, 16, 16);
+                const headMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 });
+                this.headMesh = new THREE.Mesh(headGeo, headMat);
+                this.headMesh.position.y = 1.6;
+                this.headMesh.castShadow = true;
+                this.headMesh.userData = { isHead: true, parentBot: this };
+                this.mesh.add(this.headMesh);
+
+                const gunGeo = new THREE.BoxGeometry(0.1, 0.1, 0.6);
+                const gunMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+                const gunMesh = new THREE.Mesh(gunGeo, gunMat);
+                gunMesh.position.set(0.3, 1.1, -0.3);
+                this.mesh.add(gunMesh);
+
+                scene.add(this.mesh);
+            }
+
+            update(delta, playerPos) {
+                if (!this.alive) return;
+
+                const botPos = this.mesh.position;
+                const distToPlayer = botPos.distanceTo(playerPos);
+
+                this.mesh.lookAt(playerPos.x, botPos.y, playerPos.z);
+
+                if (distToPlayer > 8) {
+                    const dir = new THREE.Vector3().subVectors(playerPos, botPos).normalize();
+                    botPos.x += dir.x * this.speed * delta;
+                    botPos.z += dir.z * this.speed * delta;
+                }
+
+                const now = performance.now();
+                if (distToPlayer < 25 && now - this.lastShotTime > 1400) {
+                    this.lastShotTime = now;
+                    botShootPlayer(this);
+                }
+            }
+
+            eliminate(isHeadshot = true) {
+                if (!this.alive) return;
+                this.alive = false;
+                scene.remove(this.mesh);
+                player.kills++;
+                const reward = isHeadshot ? 600 : 400;
+                player.money += reward;
+                updateHUD();
+
+                addKillFeed(`Player`, `MathBot_${this.id}`, isHeadshot);
+                checkRoundEndCondition();
+            }
+
+            takeDamage(amount, isHeadshot) {
+                this.eliminate(isHeadshot);
+            }
+        }
+
+        function spawnBots() {
+            bots.forEach(b => scene.remove(b.mesh));
+            bots.length = 0;
+
+            bots.push(new EnemyBot(-25, -20, 1));
+            bots.push(new EnemyBot(20, 20, 2));
+            bots.push(new EnemyBot(0, -15, 3));
+            bots.push(new EnemyBot(-15, 25, 4));
+        }
+
+        function botShootPlayer(bot) {
+            if (Math.random() < 0.45) {
+                const dmg = 12;
+                if (player.armor > 0) {
+                    player.armor = Math.max(0, player.armor - dmg * 0.5);
+                    player.health -= dmg * 0.5;
+                } else {
+                    player.health -= dmg;
+                }
+
+                soundFX.playGunshot('ak47');
+                showDamageOverlay();
+                updateHUD();
+
+                if (player.health <= 0) {
+                    playerDeath();
+                }
+            }
+        }
+
+        /* =========================================================================
+           6. INPUT & FIRST-PERSON CONTROLS
+           ========================================================================= */
+        const keys = {};
+        let isPointerLocked = false;
+        let isMathModalOpen = false;
+        let isBuyMenuOpen = false;
+
+        const touchState = {
+            moveX: 0,
+            moveY: 0,
+            lookTouchId: null,
+            lastLookX: 0,
+            lastLookY: 0
+        };
+
+        function setupTouchControls() {
+            const joystickZone = document.getElementById('joystick-zone');
+            const joystickKnob = document.getElementById('joystick-knob');
+
+            let joystickTouchId = null;
+
+            joystickZone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.changedTouches[0];
+                joystickTouchId = touch.identifier;
+                updateJoystick(touch);
+            }, { passive: false });
+
+            window.addEventListener('touchmove', (e) => {
+                for (let touch of e.changedTouches) {
+                    if (touch.identifier === joystickTouchId) {
+                        updateJoystick(touch);
+                    } else if (touch.identifier === touchState.lookTouchId) {
+                        const deltaX = touch.clientX - touchState.lastLookX;
+                        const deltaY = touch.clientY - touchState.lastLookY;
+                        touchState.lastLookX = touch.clientX;
+                        touchState.lastLookY = touch.clientY;
+
+                        const sens = 0.005;
+                        yaw -= deltaX * sens;
+                        pitch -= deltaY * sens;
+                        // 限制仰角與俯角角度，避免向上/向下看太多 (約 ±36 度)
+                        const maxPitch = Math.PI / 5;
+                        pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+
+                        camera.rotation.set(0, 0, 0);
+                        camera.rotation.y = yaw;
+                        camera.rotation.x = pitch;
+                    }
+                }
+            }, { passive: true });
+
+            const resetJoystick = (e) => {
+                for (let touch of e.changedTouches) {
+                    if (touch.identifier === joystickTouchId) {
+                        joystickTouchId = null;
+                        touchState.moveX = 0;
+                        touchState.moveY = 0;
+                        joystickKnob.style.transform = `translate(0px, 0px)`;
+                    } else if (touch.identifier === touchState.lookTouchId) {
+                        touchState.lookTouchId = null;
+                    }
+                }
+            };
+
+            window.addEventListener('touchend', resetJoystick);
+            window.addEventListener('touchcancel', resetJoystick);
+
+            function updateJoystick(touch) {
+                const rect = joystickZone.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                let dx = touch.clientX - centerX;
+                let dy = touch.clientY - centerY;
+                const maxRadius = rect.width / 2 - 10;
+
+                const distance = Math.hypot(dx, dy);
+                if (distance > maxRadius) {
+                    dx = (dx / distance) * maxRadius;
+                    dy = (dy / distance) * maxRadius;
+                }
+
+                joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+                touchState.moveX = dx / maxRadius;
+                touchState.moveY = dy / maxRadius;
+            }
+
+            window.addEventListener('touchstart', (e) => {
+                if (isMathModalOpen || isBuyMenuOpen) return;
+                for (let touch of e.changedTouches) {
+                    if (touch.clientX > window.innerWidth / 2 && touchState.lookTouchId === null) {
+                        const target = touch.target;
+                        if (!target.closest('.touch-btn') && !target.closest('#joystick-zone')) {
+                            touchState.lookTouchId = touch.identifier;
+                            touchState.lastLookX = touch.clientX;
+                            touchState.lastLookY = touch.clientY;
+                        }
+                    }
+                }
+            }, { passive: true });
+
+            document.getElementById('touch-btn-shoot').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                shootWeapon();
+            }, { passive: false });
+
+            document.getElementById('touch-btn-reload').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                reloadWeapon();
+            }, { passive: false });
+
+            document.getElementById('touch-btn-buy').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                toggleBuyMenu();
+            }, { passive: false });
+
+            document.getElementById('touch-btn-interact').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                checkInteractionPrompt(true);
+            }, { passive: false });
+        }
+
+        setupTouchControls();
+
+        let yaw = 0;
+        let pitch = 0;
+
+        function requestPointerLockSafely() {
+            const target = container || document.body;
+            const req = target.requestPointerLock || target.mozRequestPointerLock || target.webkitRequestPointerLock;
+            if (typeof req === 'function') {
+                try {
+                    req.call(target);
+                } catch (err) {
+                    console.warn('Pointer lock failed:', err);
+                    isPointerLocked = true;
+                    document.getElementById('start-screen').classList.add('hidden');
+                }
+            } else {
+                isPointerLocked = true;
+                document.getElementById('start-screen').classList.add('hidden');
+            }
+        }
+
+        function exitPointerLockSafely() {
+            const exit = document.exitPointerLock || document.mozExitPointerLock || document.webkitExitPointerLock;
+            if (typeof exit === 'function') {
+                try {
+                    exit.call(document);
+                } catch (err) {}
+            }
+            isPointerLocked = false;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+
+            if (e.code === 'KeyB' && (isPointerLocked || isBuyMenuOpen)) {
+                toggleBuyMenu();
+            }
+            if (e.code === 'KeyE' && isPointerLocked) {
+                checkInteractionPrompt(true);
+            }
+            if (e.code === 'KeyR' && isPointerLocked) {
+                reloadWeapon();
+            }
+            if (e.code === 'Tab') {
+                e.preventDefault();
+                document.getElementById('scoreboard').classList.remove('hidden');
+                updateScoreboard();
+            }
+            if (e.code === 'Escape') {
+                if (isMathModalOpen) closeMathModal(false);
+                if (isBuyMenuOpen) toggleBuyMenu();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+            if (e.code === 'Tab') {
+                document.getElementById('scoreboard').classList.add('hidden');
+            }
+        });
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            soundFX.init();
+            spawnBots();
+            requestPointerLockSafely();
+        });
+
+        ['pointerlockchange', 'mozpointerlockchange', 'webkitpointerlockchange'].forEach(evt => {
+            document.addEventListener(evt, () => {
+                const lockedEl = document.pointerLockElement || document.mozPointerLockElement || document.webkitPointerLockElement;
+                if (lockedEl === container || lockedEl === document.body) {
+                    isPointerLocked = true;
+                    document.getElementById('start-screen').classList.add('hidden');
+                } else {
+                    if (!isMathModalOpen && !isBuyMenuOpen) {
+                        isPointerLocked = false;
+                        document.getElementById('start-screen').classList.remove('hidden');
+                    }
+                }
+            });
+        });
+
+        let isMouseDown = false;
+        document.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            if (e.button === 0 && isPointerLocked && !isMathModalOpen && !isBuyMenuOpen) {
+                shootWeapon();
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isMouseDown = false;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isPointerLocked && !isMouseDown) return;
+            if (isMathModalOpen || isBuyMenuOpen) return;
+
+            const mouseSensitivity = 0.0022;
+            const movementX = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
+            const movementY = e.movementY || e.mozMovementY || e.webkitMovementY || 0;
+
+            yaw -= movementX * mouseSensitivity;
+            pitch -= movementY * mouseSensitivity;
+
+            // 限制仰角與俯角角度，避免向上/向下看太多 (約 ±36 度)
+            const maxPitch = Math.PI / 5;
+            pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+
+            camera.rotation.set(0, 0, 0);
+            camera.rotation.y = yaw;
+            camera.rotation.x = pitch;
+        });
+
+        function shootWeapon() {
+            const wpn = player.weapons[player.currentWeapon];
+            if (wpn.clip <= 0) {
+                soundFX.playReloadSound();
+                return;
+            }
+
+            wpn.clip--;
+            updateHUD();
+
+            soundFX.playGunshot(player.currentWeapon);
+
+            gunGroup.position.z += 0.08;
+            gunGroup.rotation.x += 0.05;
+            if (gunGroup.userData.muzzleLight) gunGroup.userData.muzzleLight.intensity = 3;
+
+            setTimeout(() => {
+                if (gunGroup.userData.muzzleLight) gunGroup.userData.muzzleLight.intensity = 0;
+            }, 40);
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+            const targetableObjects = [];
+            bots.filter(b => b.alive).forEach(b => {
+                b.mesh.traverse(child => {
+                    if (child.isMesh) targetableObjects.push(child);
+                });
+            });
+
+            mathTargets.forEach(t => {
+                if (!t.hit) targetableObjects.push(t.board);
+            });
+
+            const hits = raycaster.intersectObjects(targetableObjects);
+
+            if (hits.length > 0) {
+                const hitObj = hits[0].object;
+
+                if (hitObj.userData && hitObj.userData.isTargetBoard) {
+                    const target = mathTargets.find(t => t.board === hitObj);
+                    if (target && !target.hit) {
+                        target.hit = true;
+                        activeShotTarget = target;
+                        soundFX.playHeadshotSound();
+                        triggerHitmarker();
+
+                        target.board.rotation.x = Math.PI / 6;
+
+                        setTimeout(() => {
+                            openMathModal('board_target');
+                        }, 200);
+
+                        target.resetTimer = setTimeout(() => {
+                            target.board.rotation.x = target.initialRotationX;
+                            target.hit = false;
+                        }, 5000);
+                    }
+                    return;
+                }
+
+                const isHeadshot = hitObj.userData && hitObj.userData.isHead;
+                let targetBot = null;
+                bots.forEach(b => {
+                    if (b.mesh.getObjectById(hitObj.id)) targetBot = b;
+                });
+
+                if (targetBot) {
+                    // 射中敵人時觸發數學挑戰 modal
+                    activeShotTarget = targetBot;
+                    triggerHitmarker();
+                    soundFX.playHeadshotSound();
+
+                    setTimeout(() => {
+                        openMathModal('bot_target');
+                    }, 150);
+                }
+            }
+        }
+
+        function reloadWeapon() {
+            const wpn = player.weapons[player.currentWeapon];
+            const needed = wpn.maxClip - wpn.clip;
+            if (needed > 0 && wpn.reserve > 0) {
+                soundFX.playReloadSound();
+                const reloaded = Math.min(needed, wpn.reserve);
+                wpn.clip += reloaded;
+                wpn.reserve -= reloaded;
+                updateHUD();
+            }
+        }
+
+        /* =========================================================================
+           7. MATH IDENTITIES CHALLENGE MODAL & DEFUSAL LOGIC
+           ========================================================================= */
+        let currentMathQuestion = null;
+        let currentMathOptions = [];
+        let mathTimerInterval = null;
+        let mathTimeRemaining = 25.0;
+        let activeInteractionTarget = null;
+        let activeShotTarget = null;
+
+        function checkInteractionPrompt(trigger = false) {
+            const pPos = player.position;
+            const promptEl = document.getElementById('interaction-prompt');
+            const promptText = document.getElementById('prompt-text');
+
+            if (c4BombEntity && pPos.distanceTo(c4BombEntity.position) < 4) {
+                promptEl.classList.remove('hidden');
+                promptText.innerText = '拆除 C4 炸彈 (解開恆等式數學題)';
+                activeInteractionTarget = 'c4';
+
+                if (trigger) openMathModal('c4');
+                return;
+            }
+
+            let crateNear = null;
+            interactiveCrates.forEach(crate => {
+                if (!crate.userData.solved && pPos.distanceTo(crate.position) < 3.5) {
+                    crateNear = crate;
+                }
+            });
+
+            if (crateNear) {
+                promptEl.classList.remove('hidden');
+                promptText.innerText = '破解恆等式補給箱 (獲得彈藥與金錢)';
+                activeInteractionTarget = crateNear;
+
+                if (trigger) openMathModal('crate');
+                return;
+            }
+
+            promptEl.classList.add('hidden');
+            activeInteractionTarget = null;
+        }
+
+        function openMathModal(type) {
+            isMathModalOpen = true;
+            exitPointerLockSafely();
+
+            const modal = document.getElementById('math-modal');
+            modal.classList.remove('hidden');
+
+            currentMathQuestion = MATH_QUESTIONS_DB[Math.floor(Math.random() * MATH_QUESTIONS_DB.length)];
+
+            if (type === 'c4') {
+                document.getElementById('math-modal-title').innerText = 'C4 炸彈拆除安全鎖 - 恆等式驗證';
+            } else if (type === 'bot_target') {
+                document.getElementById('math-modal-title').innerText = '🤖 擊中敵方單位！請解答數學題以擊倒敵人';
+            } else if (type === 'board_target' || type === 'target') {
+                document.getElementById('math-modal-title').innerText = '🎯 擊中固定恆等式靶標 - 解答獲得獎勵';
+            } else {
+                document.getElementById('math-modal-title').innerText = '恆等式軍火補給箱 - 解鎖難題';
+            }
+
+            document.getElementById('math-topic-tag').innerText = currentMathQuestion.topic;
+            document.getElementById('math-question-text').innerHTML = currentMathQuestion.question;
+
+            const hintBox = document.getElementById('math-hint-box');
+            if (player.hasMathHint) {
+                hintBox.innerHTML = `<i class="fa-solid fa-lightbulb mr-1"></i> 已使用提示券：${currentMathQuestion.hint}`;
+                hintBox.classList.remove('hidden');
+            } else {
+                hintBox.classList.add('hidden');
+            }
+
+            // Shuffle options
+            currentMathOptions = currentMathQuestion.options.map((opt, idx) => ({
+                text: opt,
+                isCorrect: idx === currentMathQuestion.correct
+            }));
+
+            for (let i = currentMathOptions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [currentMathOptions[i], currentMathOptions[j]] = [currentMathOptions[j], currentMathOptions[i]];
+            }
+
+            const optionsGrid = document.getElementById('math-options-grid');
+            optionsGrid.innerHTML = '';
+
+            currentMathOptions.forEach((optObj, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "bg-gray-900 hover:bg-green-950 border border-gray-700 hover:border-green-500 p-4 rounded-lg text-left text-white font-bold transition flex items-center gap-3 group";
+                btn.innerHTML = `
+                    <span class="w-7 h-7 rounded-full bg-gray-800 group-hover:bg-green-600 text-green-400 group-hover:text-white flex items-center justify-center font-bold text-sm">${String.fromCharCode(65 + idx)}</span>
+                    <span class="text-base">${optObj.text}</span>
+                `;
+                btn.onclick = () => submitMathAnswer(optObj.isCorrect);
+                optionsGrid.appendChild(btn);
+            });
+
+            mathTimeRemaining = 25.0;
+            document.getElementById('math-timer').innerText = mathTimeRemaining.toFixed(1) + 's';
+
+            clearInterval(mathTimerInterval);
+            mathTimerInterval = setInterval(() => {
+                mathTimeRemaining -= 0.1;
+                document.getElementById('math-timer').innerText = Math.max(0, mathTimeRemaining).toFixed(1) + 's';
+                soundFX.playBombTick();
+
+                if (mathTimeRemaining <= 0) {
+                    clearInterval(mathTimerInterval);
+                    closeMathModal(false);
+                }
+            }, 100);
+        }
+
+        function submitMathAnswer(isCorrect) {
+            clearInterval(mathTimerInterval);
+
+            if (isCorrect) {
+                soundFX.playDefuseSuccess();
+                player.mathSolvedCount++;
+                player.money += 1000;
+
+                // Replenish Ammo
+                Object.keys(player.weapons).forEach(k => {
+                    player.weapons[k].reserve += player.weapons[k].maxClip * 2;
+                });
+
+                // Eliminate active Bot target if hit
+                if (activeShotTarget && typeof activeShotTarget.eliminate === 'function') {
+                    activeShotTarget.eliminate(true);
+                } else if (activeInteractionTarget && activeInteractionTarget.userData) {
+                    activeInteractionTarget.userData.solved = true;
+                }
+
+                closeMathModal(true);
+            } else {
+                closeMathModal(false);
+            }
+            activeShotTarget = null;
+        }
+
+        function closeMathModal(success = false) {
+            clearInterval(mathTimerInterval);
+            document.getElementById('math-modal').classList.add('hidden');
+            isMathModalOpen = false;
+
+            if (success) {
+                updateHUD();
+                checkRoundEndCondition();
+            }
+
+            requestPointerLockSafely();
+        }
+
+        /* =========================================================================
+           8. SHOP, HUD & GAME STATE UPDATES
+           ========================================================================= */
+        function toggleBuyMenu() {
+            isBuyMenuOpen = !isBuyMenuOpen;
+            const menu = document.getElementById('buy-menu');
+
+            if (isBuyMenuOpen) {
+                exitPointerLockSafely();
+                document.getElementById('shop-money').innerText = player.money;
+                menu.classList.remove('hidden');
+            } else {
+                menu.classList.add('hidden');
+                requestPointerLockSafely();
+            }
+        }
+
+        function buyWeapon(wpnKey) {
+            const prices = { ak47: 2700, m4a1: 3100, awp: 4750, deagle: 650 };
+            const cost = prices[wpnKey];
+
+            if (player.money >= cost) {
+                player.money -= cost;
+                player.currentWeapon = wpnKey;
+                buildGunMesh();
+                updateHUD();
+                document.getElementById('shop-money').innerText = player.money;
+            }
+        }
+
+        function buyItem(itemKey) {
+            if (itemKey === 'armor' && player.money >= 1000) {
+                player.money -= 1000;
+                player.armor = 100;
+            } else if (itemKey === 'math_hint' && player.money >= 500) {
+                player.money -= 500;
+                player.hasMathHint = true;
+            }
+            updateHUD();
+            document.getElementById('shop-money').innerText = player.money;
+        }
+
+        function updateHUD() {
+            const wpn = player.weapons[player.currentWeapon];
+            document.getElementById('hud-health').innerText = Math.ceil(player.health);
+            document.getElementById('hud-armor').innerText = Math.ceil(player.armor);
+            document.getElementById('hud-money').innerText = player.money;
+
+            document.getElementById('hud-weapon-name').innerText = wpn.name;
+            document.getElementById('hud-ammo-clip').innerText = wpn.clip;
+            document.getElementById('hud-ammo-reserve').innerText = wpn.reserve;
+        }
+
+        function updateRadar() {
+            const container = document.getElementById('radar-dots-container');
+            container.innerHTML = '';
+
+            bots.filter(b => b.alive).forEach(b => {
+                const relX = (b.mesh.position.x - player.position.x) * 1.5;
+                const relZ = (b.mesh.position.z - player.position.z) * 1.5;
+
+                const dot = document.createElement('div');
+                dot.className = "absolute w-2 h-2 bg-red-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-[0_0_5px_#ff0000]";
+                dot.style.left = `${50 + relX}%`;
+                dot.style.top = `${50 + relZ}%`;
+                container.appendChild(dot);
+            });
+        }
+
+        function updateScoreboard() {
+            const body = document.getElementById('scoreboard-body');
+            body.innerHTML = `
+                <tr class="bg-blue-950/40">
+                    <td class="p-2 font-bold text-blue-400"><i class="fa-solid fa-user mr-2"></i> Player (You)</td>
+                    <td class="p-2 text-center text-blue-400 font-bold">CT</td>
+                    <td class="p-2 text-center">${player.kills}</td>
+                    <td class="p-2 text-center">${player.deaths}</td>
+                    <td class="p-2 text-center text-yellow-400">${player.mathSolvedCount}</td>
+                    <td class="p-2 text-right font-bold text-green-400">${player.kills * 300 + player.mathSolvedCount * 500}</td>
+                </tr>
+            `;
+
+            bots.forEach(b => {
+                body.innerHTML += `
+                    <tr class="bg-red-950/20">
+                        <td class="p-2 text-red-400"><i class="fa-solid fa-robot mr-2"></i> Bot_${b.id}</td>
+                        <td class="p-2 text-center text-red-400 font-bold">T</td>
+                        <td class="p-2 text-center">0</td>
+                        <td class="p-2 text-center">${b.alive ? 0 : 1}</td>
+                        <td class="p-2 text-center">0</td>
+                        <td class="p-2 text-right">0</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function addKillFeed(killer, victim, isHeadshot) {
+            const feed = document.getElementById('kill-feed');
+            const entry = document.createElement('div');
+            entry.className = "bg-black/70 border-r-4 border-green-500 px-3 py-1 rounded text-xs animate-fade-in";
+            entry.innerHTML = `<span class="text-blue-400">${killer}</span> <i class="fa-solid ${isHeadshot ? 'fa-bullseye text-red-500' : 'fa-gun text-gray-400'} mx-1"></i> <span class="text-red-400">${victim}</span>`;
+            feed.appendChild(entry);
+
+            setTimeout(() => entry.remove(), 4000);
+        }
+
+        function showDamageOverlay() {
+            const overlay = document.getElementById('damage-overlay');
+            overlay.style.boxShadow = 'inset 0 0 80px rgba(255, 0, 0, 0.8)';
+            setTimeout(() => {
+                overlay.style.boxShadow = 'inset 0 0 80px rgba(255, 0, 0, 0)';
+            }, 150);
+        }
+
+        function triggerHitmarker() {
+            const hm = document.getElementById('hitmarker');
+            hm.style.opacity = '1';
+            setTimeout(() => {
+                hm.style.opacity = '0';
+            }, 100);
+        }
+
+        function playerDeath() {
+            player.deaths++;
+            player.health = 100;
+            player.armor = 100;
+            player.position.set(0, 1.6, 30);
+            spawnBots();
+            updateHUD();
+        }
+
+        function checkRoundEndCondition() {
+            const remainingBots = bots.filter(b => b.alive).length;
+            if (remainingBots === 0) {
+                setTimeout(() => {
+                    spawnBots();
+                    updateHUD();
+                }, 1500);
+            }
+        }
+
+        /* =========================================================================
+           9. MAIN ANIMATION LOOP
+           ========================================================================= */
+        let lastTime = performance.now();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const delta = Math.min(0.05, (now - lastTime) / 1000);
+            lastTime = now;
+
+            if ((isPointerLocked || touchState.moveX !== 0 || touchState.moveY !== 0) && !isMathModalOpen && !isBuyMenuOpen) {
+                const moveSpeed = 8.0;
+                const moveVector = new THREE.Vector3();
+
+                if (keys['KeyW']) moveVector.z -= 1;
+                if (keys['KeyS']) moveVector.z += 1;
+                if (keys['KeyA']) moveVector.x -= 1;
+                if (keys['KeyD']) moveVector.x += 1;
+
+                if (touchState.moveY !== 0) moveVector.z += touchState.moveY;
+                if (touchState.moveX !== 0) moveVector.x += touchState.moveX;
+
+                moveVector.normalize();
+                moveVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+
+                const nextPos = player.position.clone().addScaledVector(moveVector, moveSpeed * delta);
+                const playerBB = new THREE.Box3().setFromCenterAndSize(nextPos, new THREE.Vector3(0.8, 1.8, 0.8));
+
+                let collided = false;
+                for (let box of mapColliders) {
+                    if (playerBB.intersectsBox(box)) {
+                        collided = true;
+                        break;
+                    }
+                }
+
+                if (!collided) {
+                    player.position.copy(nextPos);
+                }
+
+                camera.position.copy(player.position);
+
+                if (moveVector.length() > 0) {
+                    gunGroup.position.y = -0.22 + Math.sin(now * 0.01) * 0.015;
+                    gunGroup.position.x = 0.2 + Math.cos(now * 0.005) * 0.01;
+                } else {
+                    gunGroup.position.y = -0.22;
+                    gunGroup.position.x = 0.2;
+                }
+
+                gunGroup.position.z += ( -0.45 - gunGroup.position.z ) * 0.2;
+                gunGroup.rotation.x += ( 0 - gunGroup.rotation.x ) * 0.2;
+
+                bots.forEach(b => b.update(delta, player.position));
+
+                checkInteractionPrompt(false);
+                updateRadar();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = () => {
+            animate();
+        };
+    </script>
+</body>
+</html>
